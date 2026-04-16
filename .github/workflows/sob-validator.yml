@@ -250,7 +250,8 @@ jobs:
             // Build detailed commit information
             let detailsSection = '';
             for (const commit of detailedIssues) {
-              detailsSection += `### Commit \`${commit.sha}\`\n\n`;
+              const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${commit.fullSha}`;
+              detailsSection += `### Commit [\`${commit.sha}\`](${commitUrl})\n\n`;
               detailsSection += `**Author:** ${commit.author}\n`;
               detailsSection += `**Committer:** ${commit.committer}\n`;
 
