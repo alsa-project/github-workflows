@@ -123,82 +123,95 @@ jobs:
             });
 
             const issues = [];
+            const detailedIssues = [];
 
             for (const commit of commits) {
               const message = commit.commit.message;
               const sha = commit.sha.substring(0, 7);
+              const fullSha = commit.sha;
+              const authorName = commit.commit.author.name;
               const authorEmail = commit.commit.author.email;
+              const committerName = commit.commit.committer.name;
               const committerEmail = commit.commit.committer.email;
 
               // Find all Signed-off-by lines (case-insensitive)
               const sobPattern = /^Signed-off-by:\s+(.+)\s+<(.+)>$/gim;
               const sobMatches = [...message.matchAll(sobPattern)];
+              const sobLines = sobMatches.map(match => `${match[1]} <${match[2]}>`);
+
+              let commitIssues = [];
 
               if (sobMatches.length === 0) {
-                issues.push(`- Commit ${sha}: Missing Signed-off-by line`);
-                continue;
-              }
+                commitIssues.push('Missing Signed-off-by line');
+              } else {
+                // Extract all SOB emails
+                const sobEmails = sobMatches.map(match => match[2]);
 
-              // Extract all SOB emails
-              const sobEmails = sobMatches.map(match => match[2]);
+                // Check if author email is in at least one Signed-off-by line
+                if (!sobEmails.includes(authorEmail)) {
+                  commitIssues.push(`Author email (${authorEmail}) not found in any Signed-off-by line`);
+                }
 
-              // Check if author email is in at least one Signed-off-by line
-              if (!sobEmails.includes(authorEmail)) {
-                issues.push(`- Commit ${sha}: Commit author email (${authorEmail}) not found in any Signed-off-by line`);
-                continue;
-              }
+                // Check if committer email is in at least one Signed-off-by line
+                // (Skip check for GitHub web-flow and noreply bots which are common for web commits)
+                const isGitHubBot = committerEmail.includes('noreply.github.com') ||
+                                    committerEmail === 'noreply@github.com';
+                if (!isGitHubBot && !sobEmails.includes(committerEmail)) {
+                  commitIssues.push(`Committer email (${committerEmail}) not found in any Signed-off-by line`);
+                }
 
-              // Check if committer email is in at least one Signed-off-by line
-              // (Skip check for GitHub web-flow and noreply bots which are common for web commits)
-              const isGitHubBot = committerEmail.includes('noreply.github.com') ||
-                                  committerEmail === 'noreply@github.com';
-              if (!isGitHubBot && !sobEmails.includes(committerEmail)) {
-                issues.push(`- Commit ${sha}: Commit committer email (${committerEmail}) not found in any Signed-off-by line`);
-                continue;
-              }
+                // Check all SOB emails against denied patterns
+                for (const sobEmail of sobEmails) {
+                  for (const pattern of deniedEmails) {
+                    const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
+                    if (regex.test(sobEmail)) {
+                      commitIssues.push(`Invalid email in Signed-off-by: ${sobEmail}`);
+                      break;
+                    }
+                  }
+                }
 
-              // Check all SOB emails against denied patterns
-              let deniedEmailFound = false;
-              for (const sobEmail of sobEmails) {
+                // Check author email against denied patterns
                 for (const pattern of deniedEmails) {
                   const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
-                  if (regex.test(sobEmail)) {
-                    issues.push(`- Commit ${sha}: Invalid email in Signed-off-by: ${sobEmail}`);
-                    deniedEmailFound = true;
+                  if (regex.test(authorEmail)) {
+                    commitIssues.push(`Invalid author email: ${authorEmail}`);
                     break;
                   }
                 }
-                if (deniedEmailFound) break;
-              }
-              if (deniedEmailFound) continue;
 
-              // Check author email against denied patterns
-              let authorDenied = false;
-              for (const pattern of deniedEmails) {
-                const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
-                if (regex.test(authorEmail)) {
-                  issues.push(`- Commit ${sha}: Invalid commit author email: ${authorEmail}`);
-                  authorDenied = true;
-                  break;
-                }
-              }
-              if (authorDenied) continue;
-
-              // Check committer email against denied patterns (skip GitHub bots)
-              if (!isGitHubBot) {
-                for (const pattern of deniedEmails) {
-                  const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
-                  if (regex.test(committerEmail)) {
-                    issues.push(`- Commit ${sha}: Invalid commit committer email: ${committerEmail}`);
-                    break;
+                // Check committer email against denied patterns (skip GitHub bots)
+                if (!isGitHubBot) {
+                  for (const pattern of deniedEmails) {
+                    const regex = new RegExp('^' + pattern.replace('*', '.*') + '$');
+                    if (regex.test(committerEmail)) {
+                      commitIssues.push(`Invalid committer email: ${committerEmail}`);
+                      break;
+                    }
                   }
                 }
+              }
+
+              if (commitIssues.length > 0) {
+                // Store simple issue for backward compatibility
+                issues.push(`- Commit ${sha}: ${commitIssues.join(', ')}`);
+
+                // Store detailed issue for enhanced comment
+                detailedIssues.push({
+                  sha: sha,
+                  fullSha: fullSha,
+                  author: `${authorName} <${authorEmail}>`,
+                  committer: `${committerName} <${committerEmail}>`,
+                  sobLines: sobLines,
+                  issues: commitIssues
+                });
               }
             }
 
             // Store results
             core.setOutput('has_issues', issues.length > 0);
             core.setOutput('issues', issues.join('\n'));
+            core.setOutput('detailed_issues', JSON.stringify(detailedIssues));
 
             return issues.length > 0;
         env:
@@ -224,7 +237,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const commentId = '<!-- sob-validator -->';
-            const issues = process.env.SOB_ISSUES;
+            const detailedIssues = JSON.parse(process.env.DETAILED_ISSUES);
 
             // Try to get custom message from config
             let customMessage = '';
@@ -234,11 +247,39 @@ jobs:
               customMessage = '\n\n' + labelConfig.description;
             }
 
+            // Build detailed commit information
+            let detailsSection = '';
+            for (const commit of detailedIssues) {
+              detailsSection += `### Commit \`${commit.sha}\`\n\n`;
+              detailsSection += `**Author:** ${commit.author}\n`;
+              detailsSection += `**Committer:** ${commit.committer}\n`;
+
+              if (commit.sobLines.length > 0) {
+                detailsSection += `**Signed-off-by lines:**\n`;
+                for (const sob of commit.sobLines) {
+                  detailsSection += `- ${sob}\n`;
+                }
+              } else {
+                detailsSection += `**Signed-off-by lines:** _(none found)_\n`;
+              }
+
+              detailsSection += `\n**Issues:**\n`;
+              for (const issue of commit.issues) {
+                detailsSection += `- ${issue}\n`;
+              }
+              detailsSection += '\n';
+            }
+
             const commentBody = commentId + '\n' +
               '## ⚠️ Signed-off-by Validation Issues\n\n' +
               'The following commits have issues with their Signed-off-by lines:\n\n' +
-              issues + '\n\n' +
-              'Please add a proper `Signed-off-by: Your Name <your.email@example.com>` line to each commit message.' +
+              detailsSection +
+              'Each commit must include a proper `Signed-off-by: Your Name <your.email@example.com>` line. ' +
+              'Additionally, both the commit author and committer emails must either match one of the Signed-off-by lines or use a valid (non-anonymous) email address.\n\n' +
+              '**Tip:** You can inspect your commits locally using:\n' +
+              '```bash\n' +
+              'git log --format=fuller\n' +
+              '```' +
               customMessage;
 
             // Check for existing comment
@@ -266,7 +307,7 @@ jobs:
               });
             }
         env:
-          SOB_ISSUES: ${{ steps.validate.outputs.issues }}
+          DETAILED_ISSUES: ${{ steps.validate.outputs.detailed_issues }}
           CONFIG_JSON: ${{ steps.read-config.outputs.config }}
 
       - name: Remove label and comment if no issues
