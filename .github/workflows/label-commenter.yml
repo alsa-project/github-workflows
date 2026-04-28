@@ -136,6 +136,31 @@ jobs:
                 });
                 console.log(`Created comment for label: ${label}`);
               }
+
+              // Check if this label should close the issue/PR
+              if (labelConfig.close === true) {
+                const isPR = !!context.payload.pull_request;
+
+                if (isPR) {
+                  // Close pull request
+                  await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: issueNumber,
+                    state: 'closed',
+                  });
+                  console.log(`Closed pull request #${issueNumber} due to label: ${label}`);
+                } else {
+                  // Close issue
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    state: 'closed',
+                  });
+                  console.log(`Closed issue #${issueNumber} due to label: ${label}`);
+                }
+              }
             }
         env:
           CONFIG_JSON: ${{ steps.read-config.outputs.config }}
