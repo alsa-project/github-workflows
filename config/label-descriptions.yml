@@ -3,7 +3,7 @@
 # Optional: Set 'close: true' to automatically close the issue/PR when the label is applied
 
 labels:
-  - name: ucm-readme
+  - name: ucm readme
     description: |
       ## Please test with the latest UCM configuration
 
