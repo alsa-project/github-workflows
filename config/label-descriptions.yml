@@ -3,6 +3,21 @@
 # Optional: Set 'close: true' to automatically close the issue/PR when the label is applied
 
 labels:
+  - name: ucm-readme
+    description: |
+      ## Please test with the latest UCM configuration
+
+      Thank you for your report! Before we dig deeper, could you please check whether the issue is already resolved in the latest UCM configuration files?
+
+      Please follow the instructions in the **README** to fetch and test the latest configuration:
+      https://github.com/alsa-project/alsa-ucm-conf/blob/master/README.md
+
+      ---
+
+      **Note for users on older distributions:** The latest UCM configuration files require a recent version of `alsa-lib` to work correctly. If your distribution ships an older version of `alsa-lib`, the latest configuration from this repository may not be compatible with your system.
+
+      In that case, we kindly ask you to reach out to your **distribution's support channels** for assistance — they are best placed to provide a configuration that matches the version of `alsa-lib` included in your release. We appreciate your understanding!
+
   - name: kernel driver
     description: |
       ## ALSA Linux kernel driver work
