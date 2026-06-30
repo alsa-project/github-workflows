@@ -18,6 +18,22 @@ labels:
 
       In that case, we kindly ask you to reach out to your **distribution's support channels** for assistance — they are best placed to provide a configuration that matches the version of `alsa-lib` included in your release. We appreciate your understanding!
 
+  - name: ucm traces
+    description: |
+      ## Please provide UCM traces
+
+      To help us diagnose this issue, please run the following command and paste the output here:
+
+      ```bash
+      LIBASOUND_DEBUG="ucm:trace" alsaucm -c hw:0 dump text
+      ```
+
+      > **Note:** Replace `0` with the number of your problematic sound card. To find the correct number, run:
+      > ```bash
+      > cat /proc/asound/cards
+      > ```
+      > Each card is listed with its index on the left — use that number in place of `0` in the command above.
+
   - name: alsa info
     description: |
       ## Please attach ALSA system information
