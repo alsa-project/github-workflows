@@ -18,6 +18,29 @@ labels:
 
       In that case, we kindly ask you to reach out to your **distribution's support channels** for assistance — they are best placed to provide a configuration that matches the version of `alsa-lib` included in your release. We appreciate your understanding!
 
+  - name: alsa info
+    description: |
+      ## Please attach ALSA system information
+
+      To help us analyze this issue, please run the following command and attach the generated file to this issue:
+
+      ```bash
+      alsa-info.sh --no-upload
+      ```
+
+      The script saves the report to `/tmp/alsa-info.txt`.
+
+      **How to attach the file to this issue:**
+      1. Open the comment box below (or edit your original report)
+      2. Drag and drop `/tmp/alsa-info.txt` into the text area, **or** click the paperclip icon / "Attach files" link and select the file
+      3. GitHub will upload it and insert a link — then submit the comment
+
+      > **Note:** If GitHub rejects the `.txt` extension, rename the file to `alsa-info.txt.gz` after compressing it:
+      > ```bash
+      > gzip -k /tmp/alsa-info.txt
+      > ```
+      > Then attach `/tmp/alsa-info.txt.gz`.
+
   - name: kernel driver
     description: |
       ## ALSA Linux kernel driver work
